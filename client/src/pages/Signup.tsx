@@ -1,7 +1,4 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
-import bcrypt from "bcryptjs";
 import axios from "axios";
 
 import { Label } from "../components/ui/label";
@@ -12,17 +9,25 @@ import {
   IconBrandGoogle,  
 } from "@tabler/icons-react";
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { initSocket } from "../utilities/socket";
 
 export default function SignupForm() {
+  const navigate = useNavigate();
+
   useEffect(() => {  
     document.title = 'Signup';
-  }, [])
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/chat');
+    }
+  }, [navigate]);
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
+  const [ErrorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,24 +36,38 @@ export default function SignupForm() {
     try {
       if (!email.endsWith("@nitk.edu.in")) {
         setStatus("invalid");
+        setErrorMsg("Invalid email.");
         return;
       }
 
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
       const res = await axios.post(
-        "http://localhost:4000/api/signup",
+        `${apiBase}/auth/signup`,
         {
           email,
           password,
-          confirmPassword
+          confirmPassword,
         },
         {
           withCredentials: true,
         }
       );
+
+      const token = res.data.token;
+      if (!token) throw new Error("No token received");
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+
+      initSocket(token);
       setStatus("success");
+      setTimeout(() => {
+        navigate("/chat");
+      }, 1500);
     } catch (err) {
       console.error("Signup error:", err);
       setStatus("error");
+      setErrorMsg(err.response?.data?.message || "An error occurred");
     }
   };
 
@@ -101,66 +120,34 @@ export default function SignupForm() {
           type="submit"
           disabled={status === "loading"}
         >
-          {status === "loading" ? "Signing Up..." : "Sign Up →"}
+          {status === "loading" ? "Processing..." : "Sign Up →"}
           <BottomGradient />
         </button>
-              
-        <div className="my-8 h-[1px] w-full bg-gradient-to-r from-transparent via-neutral-300 to-transparent dark:via-neutral-700" />
-            
-            <div className="flex justify-between">
-                <p className = "mb-3 text-sm font-medium leading-none text-black dark:text-white peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Already have an account? 
-                </p>
-                <button>
-                  <p 
-                    className = "mb-3 text-sm font-medium leading-none text-black dark:text-white peer-disabled:cursor-not-allowed peer-disabled:opacity-70"                                                                                                                                                                 
-                  >               
-                    <Link to={"/login"}>
-                      Login     
-                    </Link>
-                                                 
-                  </p>
-                </button>
-              </div>
-            
-            <div className="flex flex-col space-y-4">
-              <button
-                className="group/btn shadow-input relative flex h-10 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-4 font-medium text-black dark:bg-zinc-900 dark:shadow-[0px_0px_1px_1px_#262626]"
-                type="submit"
-              >
-                <IconBrandGithub className="w-4 h-4 text-neutral-800 dark:text-neutral-300" />
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                  GitHub
-                </span>
-                <BottomGradient />
-              </button>
-              <button
-                className="group/btn shadow-input relative flex h-10 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-4 font-medium text-black dark:bg-zinc-900 dark:shadow-[0px_0px_1px_1px_#262626]"
-                type="submit"
-              >
-                <IconBrandGoogle className="w-4 h-4 text-neutral-800 dark:text-neutral-300" />
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                  Google
-                </span>
-              <BottomGradient />
-              </button>          
-            </div>
 
+        <div className="my-8 h-[1px] w-full bg-gradient-to-r from-transparent via-neutral-300 to-transparent dark:via-neutral-700" />
+
+        <div className="flex justify-between">
+          <p className="mb-3 text-sm font-medium leading-none text-black dark:text-white peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            Already have an account?
+          </p>
+          <button>
+            <p className="mb-3 text-sm font-medium leading-none text-black dark:text-white peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              <Link to={"/login"}>Login</Link>
+            </p>
+          </button>
+        </div>
         <div className="mt-4 text-sm">
           {status === "success" && (
-            <p className="text-green-600">Account created successfully</p>
+            <p className="text-green-600">
+              Account created successfully! Redirecting...
+            </p>
           )}
           {status === "invalid" && (
             <p className="text-yellow-600">
               Only @nitk.edu.in emails are allowed
             </p>
           )}
-          {status === "error" && (
-            <p className="text-red-600">
-              Signup failed. Check console.
-            </p>
-          )}
-          )
+          {status === "error" && <p className="text-red-600">{ErrorMsg}</p>}
         </div>
       </form>
     </div>

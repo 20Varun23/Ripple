@@ -1,17 +1,30 @@
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
-import UserRouter from "./routes/user.routes.js"
-
-const app = express();
-const PORT = process.env.PORT || 4000;
+import authRouter from "./routes/auth.routes.js";
+import chatRouter from './routes/chat.routes.js';
+import http from "http";
+import { initSocket } from "./socket/index.js";
+import { startRoomExpiryJob } from "./services/socket.services.js";
+import { attachIO } from "./middleware/socket.middleware.js";
 
 dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const server = http.createServer(app);
+
+initSocket(server);
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      process.env.CLIENT_URL
+    ],
     credentials: true,
   })
 );
@@ -19,8 +32,14 @@ app.use(
 app.use(express.json()); 
 app.use(cookieParser());
 
-app.listen(PORT, () =>
-  console.log(`Server started at PORT ${PORT}`)
-);
+app.use(attachIO);
 
-app.use("/api",UserRouter)
+app.use("/auth",authRouter)
+app.use("/groupchat",chatRouter)
+app.use("/directChat",chatRouter)
+
+// startRoomExpiryJob();
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

@@ -1,7 +1,5 @@
-"use client"
-
 import React, { useState, useEffect } from "react";
-import bcrypt from "bcryptjs";
+
 import axios from "axios";
 
 import { Label } from "../components/ui/label";
@@ -13,12 +11,21 @@ import {
 } from "@tabler/icons-react";
 
 import { Link } from "react-router-dom";
+import { initSocket } from "../utilities/socket";
+import { useNavigate } from "react-router-dom";
+
 
 export default function LoginForm() {
+  const navigate = useNavigate();
+
   useEffect(() => {  
     document.title = 'Login';      
-    }, [])
-    
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/chat');
+    }
+  }, [navigate]);
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -33,8 +40,9 @@ export default function LoginForm() {
         return;
       }
 
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
       const res = await axios.post(
-        "http://localhost:4000/api/login",
+        `${apiBase}/auth/login`,
         {
           email,
           password
@@ -43,6 +51,20 @@ export default function LoginForm() {
           withCredentials: true,
         }
       );
+
+      const user = res.data.user; 
+      const token = res.data.token;
+      if(!token) throw new Error("No token received");
+
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      setStatus("Success");
+      navigate('/chat')
+
+      initSocket(token);
+      
     } catch (err) {
       console.error("Login Error:", err);
       setStatus("error");
@@ -110,30 +132,6 @@ export default function LoginForm() {
             </p>
           </button>
         </div>            
-        <div className="flex flex-col space-y-4">
-          <button
-            className="group/btn shadow-input relative flex h-10 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-4 font-medium text-black dark:bg-zinc-900 dark:shadow-[0px_0px_1px_1px_#262626]"
-            type="submit"
-          >              
-            
-            <IconBrandGithub className="w-4 h-4 text-neutral-800 dark:text-neutral-300" />
-            <span className="text-sm text-neutral-700 dark:text-neutral-300">
-              GitHub
-            </span>
-            <BottomGradient />
-          </button>
-          <button
-            className="group/btn shadow-input relative flex h-10 w-full items-center justify-start space-x-2 rounded-md bg-gray-50 px-4 font-medium text-black dark:bg-zinc-900 dark:shadow-[0px_0px_1px_1px_#262626]"
-            type="submit"
-          >
-            <IconBrandGoogle className="w-4 h-4 text-neutral-800 dark:text-neutral-300" />
-            <span className="text-sm text-neutral-700 dark:text-neutral-300">
-              Google
-            </span>
-            <BottomGradient />
-          </button>          
-        </div>
-        
         <div className="mt-4 text-sm">
           {status === "success" && (
             <p className="text-green-600">Login successful</p>
